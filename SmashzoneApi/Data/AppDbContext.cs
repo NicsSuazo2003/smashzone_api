@@ -1,0 +1,317 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using SmashzoneApi.Entities;
+
+namespace SmashzoneApi.Data;
+
+public class AppDbContext : DbContext
+{
+    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
+
+    public DbSet<User> Users => Set<User>();
+    public DbSet<Court> Courts => Set<Court>();
+    public DbSet<Booking> Bookings => Set<Booking>();
+    public DbSet<TimeSlot> TimeSlots => Set<TimeSlot>();
+    public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<BlockedDate> BlockedDates => Set<BlockedDate>();
+    public DbSet<PriceRule> PriceRules => Set<PriceRule>();
+    public DbSet<Client> Clients => Set<Client>();
+    public DbSet<OpenPlaySession> OpenPlaySessions => Set<OpenPlaySession>();
+    public DbSet<OpenPlaySessionCourt> OpenPlaySessionCourts => Set<OpenPlaySessionCourt>();
+    public DbSet<PricingRule> PricingRules => Set<PricingRule>();
+    public DbSet<SecurityEventEntity> SecurityEvents => Set<SecurityEventEntity>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        ConfigureDateTimeUtc(modelBuilder);
+
+        foreach (var entity in modelBuilder.Model.GetEntityTypes())
+        {
+            entity.SetTableName(entity.GetTableName()!.ToLower());
+        }
+
+        // ── User ──
+        modelBuilder.Entity<User>(e =>
+        {
+            e.HasIndex(u => u.Email).IsUnique();
+            e.Property(u => u.ClientId).HasColumnName("client_id");
+
+            e.HasOne(u => u.Client)
+                .WithMany()
+                .HasForeignKey(u => u.ClientId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ── Client ──
+        modelBuilder.Entity<Client>(e =>
+        {
+            e.Property(c => c.Id).HasColumnName("id");
+            e.Property(c => c.Name).HasColumnName("name");
+            e.Property(c => c.Subdomain).HasColumnName("subdomain");
+            e.Property(c => c.LogoUrl).HasColumnName("logo_url");
+            e.Property(c => c.PrimaryColor).HasColumnName("primary_color");
+            e.Property(c => c.AccentColor).HasColumnName("accent_color");
+            e.Property(c => c.GcashNumber).HasColumnName("gcash_number");
+            e.Property(c => c.GcashAccountName).HasColumnName("gcash_account_name");
+            e.Property(c => c.PaymentMethods)
+                .HasColumnName("payment_methods")
+                .HasColumnType("jsonb");
+
+            e.Property(c => c.AvailableAmenitiesJson)
+                .HasColumnName("available_amenities_json")
+                .HasColumnType("jsonb");
+
+            e.Property(c => c.MaxAdvanceBookingDays)
+                .HasColumnName("max_advance_booking_days")
+                .HasDefaultValue(90);
+
+            e.Property(c => c.BookingWindowMode)
+                .HasColumnName("booking_window_mode")
+                .HasDefaultValue("rolling");
+
+            e.Property(c => c.BookingOpenDate)
+                .HasColumnName("booking_open_date")
+                .HasColumnType("date");
+
+            e.Property(c => c.BookingCloseDate)
+                .HasColumnName("booking_close_date")
+                .HasColumnType("date");
+
+            e.Property(c => c.CreatedAt).HasColumnName("created_at");
+            e.Property(c => c.Status).HasColumnName("status");
+
+            e.HasMany(c => c.Courts)
+                .WithOne(crt => crt.Client)
+                .HasForeignKey(crt => crt.ClientId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasMany(c => c.Bookings)
+                .WithOne(b => b.Client)
+                .HasForeignKey(b => b.ClientId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ── PricingRule ──
+        modelBuilder.Entity<PricingRule>(e =>
+        {
+            e.HasIndex(r => r.CourtId);
+            e.HasOne(r => r.Court)
+                .WithMany(c => c.PricingRules)
+                .HasForeignKey(r => r.CourtId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ── Court ──
+        modelBuilder.Entity<Court>(e =>
+        {
+            e.HasMany(c => c.Bookings)
+                .WithOne(b => b.Court)
+                .HasForeignKey(b => b.CourtId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.Property(c => c.ClientId).HasColumnName("client_id");
+            e.HasOne(c => c.Client)
+                .WithMany(cl => cl.Courts)
+                .HasForeignKey(c => c.ClientId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Court>(e =>
+        {
+            e.HasMany(c => c.TimeSlots)
+                .WithOne(ts => ts.Court)
+                .HasForeignKey(ts => ts.CourtId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<Court>(e =>
+        {
+            e.HasMany(c => c.BlockedDates)
+                .WithOne(bd => bd.Court)
+                .HasForeignKey(bd => bd.CourtId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // ── Booking ──
+        modelBuilder.Entity<Booking>(e =>
+        {
+            e.HasMany(b => b.Slots)
+                .WithOne(s => s.Booking)
+                .HasForeignKey(s => s.BookingId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(b => b.Court)
+                .WithMany(c => c.Bookings)
+                .HasForeignKey(b => b.CourtId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.Property(b => b.ClientId).HasColumnName("client_id");
+            e.HasOne(b => b.Client)
+                .WithMany(cl => cl.Bookings)
+                .HasForeignKey(b => b.ClientId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.Property(b => b.OpenPlaySessionId).HasColumnName("OpenPlaySessionId");
+            e.HasOne(b => b.OpenPlaySession)
+                .WithMany(s => s.Bookings)
+                .HasForeignKey(b => b.OpenPlaySessionId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            e.Property(b => b.Date).HasConversion(new DateTimeToUtcConverter());
+
+            e.HasIndex(b => b.ReferenceCode).IsUnique();
+        });
+
+        // ── TimeSlot ──
+        modelBuilder.Entity<TimeSlot>(e =>
+        {
+            e.HasOne(ts => ts.Booking)
+                .WithMany(b => b.Slots)
+                .HasForeignKey(ts => ts.BookingId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(ts => ts.Court)
+                .WithMany(c => c.TimeSlots)
+                .HasForeignKey(ts => ts.CourtId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            e.Property(ts => ts.Date).HasConversion(new DateTimeToUtcConverter());
+
+            e.HasIndex(ts => new { ts.CourtId, ts.Date, ts.StartTime })
+                .IsUnique()
+                .HasFilter("\"CourtId\" IS NOT NULL");
+        });
+
+        // ── BlockedDate ──
+        modelBuilder.Entity<BlockedDate>(e =>
+        {
+            e.Property(bd => bd.ClientId).HasColumnName("client_id");
+
+            e.HasOne(bd => bd.Client)
+                .WithMany()
+                .HasForeignKey(bd => bd.ClientId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(bd => bd.Court)
+                .WithMany(c => c.BlockedDates)
+                .HasForeignKey(bd => bd.CourtId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            e.Property(bd => bd.Date).HasConversion(new DateTimeToUtcConverter());
+        });
+
+        // ── PriceRule ──
+        modelBuilder.Entity<PriceRule>(e =>
+        {
+            e.Property(pr => pr.ClientId).HasColumnName("client_id");
+            e.HasOne(pr => pr.Client)
+                .WithMany()
+                .HasForeignKey(pr => pr.ClientId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ── Notification ──
+        modelBuilder.Entity<Notification>(e =>
+        {
+            e.HasOne(n => n.User)
+                .WithMany(u => u.Notifications)
+                .HasForeignKey(n => n.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ── OpenPlaySession ──
+        modelBuilder.Entity<OpenPlaySession>(e =>
+        {
+            e.Property(s => s.ClientId).HasColumnName("ClientId");
+            e.Property(s => s.CourtId).HasColumnName("CourtId");
+            e.Property(s => s.Date).HasColumnName("Date");
+            e.Property(s => s.StartTime).HasColumnName("StartTime");
+            e.Property(s => s.EndTime).HasColumnName("EndTime");
+            e.Property(s => s.MaxPlayers).HasColumnName("MaxPlayers");
+            e.Property(s => s.CurrentPlayers).HasColumnName("CurrentPlayers");
+            e.Property(s => s.PricePerPlayer)
+                .HasColumnName("PricePerPlayer")
+                .HasColumnType("decimal(10,2)");
+            e.Property(s => s.SkillLevel).HasColumnName("SkillLevel");
+            e.Property(s => s.HostName).HasColumnName("HostName");
+            e.Property(s => s.Title).HasColumnName("Title");
+            e.Property(s => s.Description).HasColumnName("Description");
+            e.Property(s => s.IsActive).HasColumnName("IsActive");
+            e.Property(s => s.CreatedAt).HasColumnName("CreatedAt");
+
+            e.HasOne(s => s.Client)
+                .WithMany()
+                .HasForeignKey(s => s.ClientId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(s => s.Court)
+                .WithMany()
+                .HasForeignKey(s => s.CourtId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasMany(s => s.SessionCourts)
+                .WithOne(sc => sc.OpenPlaySession)
+                .HasForeignKey(sc => sc.OpenPlaySessionId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.Property(s => s.Date).HasConversion(new DateTimeToUtcConverter());
+        });
+
+        // ── OpenPlaySessionCourt ──
+        modelBuilder.Entity<OpenPlaySessionCourt>(e =>
+        {
+            e.Property(sc => sc.OpenPlaySessionId).HasColumnName("OpenPlaySessionId");
+            e.Property(sc => sc.CourtId).HasColumnName("CourtId");
+            e.Property(sc => sc.CreatedAt).HasColumnName("CreatedAt");
+
+            e.HasIndex(sc => new { sc.OpenPlaySessionId, sc.CourtId }).IsUnique();
+
+            e.HasOne(sc => sc.Court)
+                .WithMany()
+                .HasForeignKey(sc => sc.CourtId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ── SecurityEvent ──
+        modelBuilder.Entity<SecurityEventEntity>(e =>
+        {
+            e.ToTable("security_events");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Metadata).HasColumnType("jsonb");
+            e.Property(x => x.IpAddress).HasColumnType("inet");
+            e.HasIndex(x => new { x.ClientId, x.OccurredAt })
+                .HasDatabaseName("ix_secevents_client_time");
+            e.HasIndex(x => new { x.ClientId, x.EventType, x.OccurredAt })
+                .HasDatabaseName("ix_secevents_type_time");
+        });
+    }
+
+    private void ConfigureDateTimeUtc(ModelBuilder modelBuilder)
+    {
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            foreach (var property in entityType.GetProperties())
+            {
+                // Only apply NOW() default to required DateTime.
+                // Nullable DateTime? must default to NULL — the null is meaningful
+                // (e.g. LockoutUntil = null means "not locked",
+                // PasswordResetExpiresAt = null means "no pending reset",
+                // BookingOpenDate = null means "no window configured").
+                if (property.ClrType == typeof(DateTime))
+                {
+                    property.SetDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
+                }
+            }
+        }
+    }
+}
+
+public class DateTimeToUtcConverter : ValueConverter<DateTime, DateTime>
+{
+    public DateTimeToUtcConverter()
+        : base(
+            v => v.Kind == DateTimeKind.Utc ? v : DateTime.SpecifyKind(v, DateTimeKind.Utc),
+            v => v.Kind == DateTimeKind.Utc ? v : DateTime.SpecifyKind(v, DateTimeKind.Utc))
+    {
+    }
+}
