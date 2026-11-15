@@ -31,13 +31,14 @@ public class FileController : ControllerBase
 
         var supabaseUrl = _config["Supabase:Url"]!;
         var supabaseKey = _config["Supabase:Key"]!;
+        var supabaseBucket = _config["Supabase:Bucket"]!;
         var fileName = $"{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
 
         using var content = new StreamContent(file.OpenReadStream());
         content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(file.ContentType);
 
         var request = new HttpRequestMessage(HttpMethod.Post,
-            $"{supabaseUrl}/storage/v1/object/PickleImgs/{fileName}")
+            $"{supabaseUrl}/storage/v1/object/{supabaseBucket}/{fileName}")
         {
             Content = content
         };
@@ -47,7 +48,7 @@ public class FileController : ControllerBase
         if (!response.IsSuccessStatusCode)
             return BadRequest(new { message = "Upload failed" });
 
-        var url = $"{supabaseUrl}/storage/v1/object/public/PickleImgs/{fileName}";
+        var url = $"{supabaseUrl}/storage/v1/object/public/{supabaseBucket}/{fileName}";
         return Ok(new { url });
     }
 
@@ -58,10 +59,11 @@ public class FileController : ControllerBase
 
         var supabaseUrl = _config["Supabase:Url"]!;
         var supabaseKey = _config["Supabase:Key"]!;
+        var supabaseBucket = _config["Supabase:Bucket"]!;
         var fileName = Path.GetFileName(new Uri(request.Url).AbsolutePath);
 
         var httpRequest = new HttpRequestMessage(HttpMethod.Delete,
-            $"{supabaseUrl}/storage/v1/object/PickleImgs/{fileName}");
+            $"{supabaseUrl}/storage/v1/object/{supabaseBucket}/{fileName}");
         httpRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", supabaseKey);
 
         await _http.SendAsync(httpRequest);

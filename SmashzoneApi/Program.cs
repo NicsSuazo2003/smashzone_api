@@ -297,7 +297,7 @@ var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<st
 // or Render env vars say. Union with config + dedupe case-insensitively.
 var requiredOrigins = new[]
 {
-    "https://smashzonepicklecenter.vercel.app",
+    "https://smashzone-jerjen.vercel.app",
     "https://smashzone-booking.vercel.app",
     "https://smashzone.vercel.app",
     "http://localhost:5173",

@@ -89,13 +89,14 @@ public class BookingController : ControllerBase
         {
             var supabaseUrl = _config["Supabase:Url"]!;
             var supabaseKey = _config["Supabase:Key"]!;
+            var supabaseBucket = _config["Supabase:Bucket"]!;
             var fileName = $"payment-{Guid.NewGuid()}{Path.GetExtension(screenshot.FileName)}";
 
             using var content = new StreamContent(screenshot.OpenReadStream());
             content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(screenshot.ContentType);
 
             var httpRequest = new HttpRequestMessage(HttpMethod.Post,
-                $"{supabaseUrl}/storage/v1/object/PickleImgs/{fileName}")
+                $"{supabaseUrl}/storage/v1/object/{supabaseBucket}/{fileName}")
             {
                 Content = content
             };
@@ -106,7 +107,7 @@ public class BookingController : ControllerBase
             if (!response.IsSuccessStatusCode)
                 return BadRequest(new { message = "Screenshot upload failed" });
 
-            screenshotUrl = $"{supabaseUrl}/storage/v1/object/public/PickleImgs/{fileName}";
+            screenshotUrl = $"{supabaseUrl}/storage/v1/object/public/{supabaseBucket}/{fileName}";
         }
 
         // ? Pass paymentMethod through to the service

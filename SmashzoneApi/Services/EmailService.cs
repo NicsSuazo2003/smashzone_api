@@ -9,32 +9,31 @@ public class EmailService
     private readonly IConfiguration _config;
     private readonly ILogger<EmailService> _logger;
 
-    // ── Neutrals — Carbon Pitch ──
-    private const string OUTER_BG = "#0A0B0D";
-    private const string BODY_BG = "#111317";
-    private const string BANNER_BG = "#1D2028";
-    private const string DIVIDER = "#313642";
+    // ── Neutrals — Light Canvas ──
+    private const string OUTER_BG = "#F8FAFC";
+    private const string BODY_BG = "#FFFFFF";
+    private const string BANNER_BG = "#3D1164";
+    private const string DIVIDER = "#E2E8F0";
 
-    // ── Primary — Championship Red ──
-    private const string PRIMARY = "#ED1C24";
+    // ── Primary — Deep Athletic Purple ──
+    private const string PRIMARY = "#3D1164";
     private const string PRIMARY_TEXT = "#FFFFFF";
 
-    // ── Accent — Optic Court Gold ──
-    private const string ACCENT = "#FFB703";
+    // ── Accents — Vibrant Orange and Pickleball Golden Yellow ──
+    private const string ACCENT = "#FF7A00";
 
-    // ── Cream / Silver White ──
-    private const string TEXT_CREAM = "#FFFFFF";
-    private const string TEXT_CREAM_DARK = "#EEF2F6";
-    private const string TEXT_CREAM_MUTED = "#7A8395";
+    // ── Dark Graphite Text ──
+    private const string TEXT_CREAM = "#0D0E12";
+    private const string TEXT_CREAM_DARK = "#0A0B0D";
+    private const string TEXT_CREAM_MUTED = "#64748B";
 
     // ── Semantic ──
-    private const string SUCCESS = "#10B981";
-    private const string ERROR = "#ED1C24";
-    private const string WARNING = "#FFB703";
-    private const string INFO = "#38BDF8";
+    private const string SUCCESS = "#3D1164";
+    private const string ERROR = "#B42318";
+    private const string WARNING = "#FFA81A";
+    private const string INFO = "#FF7A00";
 
-    // ✅ UPDATED: Pointed to the new Smashzone Vercel deployment
-    private const string ADMIN_URL = "https://smashzonepicklecenter.vercel.app/admin";
+    private string AdminUrl => $"{_config["App:FrontendUrl"]?.TrimEnd('/')}/admin";
 
     public EmailService(IConfiguration config, ILogger<EmailService> logger)
     {
@@ -216,7 +215,7 @@ public class EmailService
         return $@"
               <table role='presentation' cellpadding='0' cellspacing='0' border='0' style='margin-top:28px;'>
                 <tr>
-                  <td align='center' style='border-radius:10px;background-color:{PRIMARY};box-shadow:0 0 20px -3px rgba(237,28,36,0.45);'>
+                  <td align='center' style='border-radius:10px;background-color:{PRIMARY};box-shadow:0 0 20px -3px rgba(61,17,100,0.30);'>
                     <a href='{url}' target='_blank' style='display:inline-block;padding:13px 30px;font-size:14px;font-weight:700;color:{PRIMARY_TEXT};text-decoration:none;border-radius:10px;'>
                       {text}
                     </a>
@@ -260,7 +259,7 @@ public class EmailService
                 {KvRow("Amount", FormatAmount(amount), isLast: true)}
               </table>
 
-              {CtaButton(ADMIN_URL, "Review in Admin Panel")}
+              {CtaButton(AdminUrl, "Review in Admin Panel")}
             ";
 
             var html = WrapLayout("New Booking", content);
