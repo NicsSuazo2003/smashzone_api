@@ -33,7 +33,7 @@ public class EmailService
     private const string WARNING = "#FFA81A";
     private const string INFO = "#FF7A00";
 
-    private string AdminUrl => $"{_config["App:FrontendUrl"]?.TrimEnd('/')}/admin";
+    private string AdminUrl => $"{_config["App:FrontendUrl"]?.TrimEnd('/')}/admin/bookings";
 
     public EmailService(IConfiguration config, ILogger<EmailService> logger)
     {
