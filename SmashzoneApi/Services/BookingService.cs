@@ -35,7 +35,7 @@ public class BookingService : IBookingService
         }
     }
 
-    // ✅ NEW — helper: does any timeslot (regardless of owner booking's status) overlap?
+    // Checks whether any active booking overlaps the requested timeslot.
     private async Task<bool> HasTimeslotConflictAsync(
         Guid courtId, DateTime date, TimeOnly start, TimeOnly end, Guid? excludeBookingId = null)
     {
@@ -43,12 +43,37 @@ public class BookingService : IBookingService
             .Where(s => s.CourtId == courtId
                      && s.Date == date
                      && s.StartTime < end
-                     && s.EndTime > start);
+                     && s.EndTime > start
+                     && s.Booking.Status != "cancelled"
+                     && s.Booking.Status != "expired"
+                     && s.Booking.Status != "rejected"
+                     && s.Booking.Status != "refunded");
 
         if (excludeBookingId.HasValue)
             q = q.Where(s => s.BookingId != excludeBookingId.Value);
 
         return await q.AnyAsync();
+    }
+
+    private async Task RemoveTerminalTimeslotsAsync(
+        Guid courtId, DateTime date, TimeOnly start, TimeOnly end)
+    {
+        var staleSlots = await _db.TimeSlots
+            .Where(s => s.CourtId == courtId
+                     && s.Date == date
+                     && s.StartTime < end
+                     && s.EndTime > start
+                     && (s.Booking.Status == "cancelled"
+                         || s.Booking.Status == "expired"
+                         || s.Booking.Status == "rejected"
+                         || s.Booking.Status == "refunded"))
+            .ToListAsync();
+
+        if (staleSlots.Count > 0)
+        {
+            _db.TimeSlots.RemoveRange(staleSlots);
+            await _db.SaveChangesAsync();
+        }
     }
 
     // ✅ NEW — helper: free a booking's timeslots when it moves to a terminal status
@@ -107,10 +132,11 @@ public class BookingService : IBookingService
                     if (!TimeOnly.TryParse(slot.EndTime, out var endTime))
                         throw new InvalidOperationException($"Invalid end time: {slot.EndTime}");
 
-                    // ✅ FIX — conflict check queries TimeSlots directly, ignoring
-                    // the owning booking's status. An "expired" booking still
-                    // physically owns its timeslot rows and would otherwise
-                    // trigger a unique-index 500 on insert.
+                    // Remove terminal rows left by an interrupted status transition
+                    // before checking the unique timeslot constraint.
+                    await RemoveTerminalTimeslotsAsync(
+                        courtGuid, bookingDate, startTime, endTime);
+
                     var conflicting = await HasTimeslotConflictAsync(
                         courtGuid, bookingDate, startTime, endTime);
 
